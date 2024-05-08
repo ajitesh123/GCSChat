@@ -14,50 +14,15 @@ warnings.filterwarnings("ignore")
 chat_history = []
 snow_ddl = Snowddl()
 
-gradient_text_html = """
-<style>
-.gradient-text {
-    font-weight: bold;
-    background: -webkit-linear-gradient(left, red, orange);
-    background: linear-gradient(to right, red, orange);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    display: inline;
-    font-size: 3em;
-}
-</style>
-<div class="gradient-text">snowChat</div>
-"""
-
-st.markdown(gradient_text_html, unsafe_allow_html=True)
-
+st.title("snowChat")
 st.caption("Talk your way through data")
 model = st.radio(
     "",
-    options=["Claude-3 Haiku", "Mixtral 8x7B", "Llama 3-70B", "GPT-3.5", "Snowflake Arctic"],
+    options=["✨ GPT-3.5", "♾️ codellama", "⛰️ Mixtral"],
     index=0,
     horizontal=True,
 )
 st.session_state["model"] = model
-
-if "toast_shown" not in st.session_state:
-    st.session_state["toast_shown"] = False
-
-if "rate-limit" not in st.session_state:
-    st.session_state["rate-limit"] = False
-
-# Show the toast only if it hasn't been shown before
-if not st.session_state["toast_shown"]:
-    st.toast("The snowflake data retrieval is disabled for now.", icon="👋")
-    st.session_state["toast_shown"] = True
-
-# Show a warning if the model is rate-limited
-if st.session_state["rate-limit"]:
-    st.toast("Probably rate limited.. Go easy folks", icon="⚠️")
-    st.session_state["rate-limit"] = False
-
-if st.session_state["model"] == "Mixtral 8x7B":
-    st.warning("This is highly rate-limited. Please use it sparingly", icon="⚠️")
 
 INITIAL_MESSAGE = [
     {"role": "user", "content": "Hi!"},
@@ -73,8 +38,10 @@ with open("ui/sidebar.md", "r") as sidebar_file:
 with open("ui/styles.md", "r") as styles_file:
     styles_content = styles_file.read()
 
+# Display the DDL for the selected table
 st.sidebar.markdown(sidebar_content)
 
+# Create a sidebar with a dropdown menu
 selected_table = st.sidebar.selectbox(
     "Select a table:", options=list(snow_ddl.ddl_dict.keys())
 )
@@ -114,10 +81,9 @@ for message in st.session_state.messages:
         message["content"],
         True if message["role"] == "user" else False,
         True if message["role"] == "data" else False,
-        model,
     )
 
-callback_handler = StreamlitUICallbackHandler(model)
+callback_handler = StreamlitUICallbackHandler()
 
 chain = load_chain(st.session_state["model"], callback_handler)
 
@@ -169,10 +135,9 @@ if (
     and st.session_state["messages"][-1]["role"] != "assistant"
 ):
     user_input_content = st.session_state["messages"][-1]["content"]
+    # print(f"User input content is: {user_input_content}")
 
     if isinstance(user_input_content, str):
-        callback_handler.start_loading_message()
-
         result = chain.invoke(
             {
                 "question": user_input_content,
@@ -187,16 +152,13 @@ if (
         #     if df is not None:
         #         callback_handler.display_dataframe(df)
         #         append_message(df, "data", True)
-uploaded_file = st.sidebar.file_uploader("Upload PDF", type="pdf")
-if uploaded_file is not None:
-    public_url = GCloudStorage('your-bucket-name').upload_blob(uploaded_file, uploaded_file.name)
-    extracted_text = PDFExtractor().extract_text(uploaded_file)
-    DocumentProcessor().process(extracted_text)
-    question = st.text_input("Ask a question about the document:")
-    if question:
-        answer = StreamlitUICallbackHandler().query_document(question)
-        st.write(answer)
-try:
-    # Existing file upload and processing logic...
-except Exception as e:
-    st.error(f"An error occurred: {str(e)}")
+    if document_path := st.file_uploader("Upload your document"):
+        uploaded_url = doc_processor.upload_document(document_path)
+        st.session_state["uploaded_document_url"] = uploaded_url
+
+    if question := st.text_input("Ask a question about the document"):
+        if "uploaded_document_url" in st.session_state:
+            answer = model.answer_question(question, st.session_state["uploaded_document_url"])
+            st.write(answer)
+        else:
+            st.write("Please upload a document first.")

@@ -33,10 +33,24 @@ class DocumentProcessor:
         )
         self.embeddings = OpenAIEmbeddings(openai_api_key=secrets.OPENAI_API_KEY)
 
-    def process(self, file_stream) -> Dict[str, Any]:
-        text = PDFExtractor().extract_text(file_stream)
+import boto3
+from google.cloud import storage
+
+class DocumentProcessor:
+    def upload_document(self, doc_path):
+        """Uploads a document to Google Cloud Storage and returns the URL."""
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(self.secrets.GCS_BUCKET_NAME)
+        blob = bucket.blob(doc_path.name)
+        blob.upload_from_file(doc_path)
+        return f"gs://{bucket.name}/{blob.name}"
+
+    def process(self) -> Dict[str, Any]:
+        data = self.loader.load()
+        texts = self.text_splitter.split_documents(data)
+        document_urls = [self.upload_document(doc_path) for doc_path in data.keys()]
         vector_store = SupabaseVectorStore.from_documents(
-            [text], self.embeddings, client=self.client
+            texts, self.embeddings, client=self.client, document_urls=document_urls
         )
         return vector_store
 

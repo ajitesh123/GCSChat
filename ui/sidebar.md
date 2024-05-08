@@ -1,2 +1,3 @@
-st.sidebar.file_uploader("Upload a PDF", type=["pdf"], key="pdf-upload")
-
+## Document Upload
+- Upload your document using the file uploader.
+- Ask questions about the uploaded document in the provided text input field.
