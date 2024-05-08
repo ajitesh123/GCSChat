@@ -1,8 +1,7 @@
 from typing import Any, Callable, Dict, Optional
 
-import boto3
 import streamlit as st
-from langchain.chat_models import BedrockChat, ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.llms import OpenAI
 from langchain.vectorstores import SupabaseVectorStore
@@ -34,7 +33,7 @@ class ModelConfig(BaseModel):
 
     @validator("model_type", pre=True, always=True)
     def validate_model_type(cls, v):
-        if v not in ["gpt", "codellama", "mixtral"]:
+        if v not in ["gpt", "llama", "claude", "mixtral8x7b", "arctic"]:
             raise ValueError(f"Unsupported model type: {v}")
         return v
 
@@ -53,68 +52,81 @@ class ModelWrapper:
     def setup(self):
         if self.model_type == "gpt":
             self.setup_gpt()
-        elif self.model_type == "codellama":
-            self.setup_codellama()
-        elif self.model_type == "mixtral":
-            self.setup_mixtral()
+        elif self.model_type == "claude":
+            self.setup_claude()
+        elif self.model_type == "mixtral8x7b":
+            self.setup_mixtral_8x7b()
+        elif self.model_type == "llama":
+            self.setup_llama()
+        elif self.model_type == "arctic":
+            self.setup_arctic()
 
     def setup_gpt(self):
         self.llm = ChatOpenAI(
-            model_name="gpt-3.5-turbo-0125",
+            model_name="gpt-3.5-turbo",
             temperature=0.2,
             api_key=self.secrets["OPENAI_API_KEY"],
-            max_tokens=500,
+            max_tokens=1000,
             callbacks=[self.callback_handler],
             streaming=True,
-            base_url=self.gateway_url,
+            # base_url=self.gateway_url,
         )
 
-    def setup_mixtral(self):
+    def setup_mixtral_8x7b(self):
         self.llm = ChatOpenAI(
-            model_name="mistralai/Mixtral-8x7B-Instruct-v0.1",
+            model_name="mixtral-8x7b-32768",
             temperature=0.2,
-            api_key=self.secrets["MIXTRAL_API_KEY"],
-            max_tokens=500,
+            api_key=self.secrets["GROQ_API_KEY"],
+            max_tokens=3000,
             callbacks=[self.callback_handler],
             streaming=True,
-            base_url="https://api.together.xyz/v1",
+            base_url="https://api.groq.com/openai/v1",
         )
 
-    def setup_codellama(self):
+    def setup_claude(self):
         self.llm = ChatOpenAI(
-            model_name="codellama/codellama-70b-instruct",
-            temperature=0.2,
+            model_name="anthropic/claude-3-haiku",
+            temperature=0.1,
             api_key=self.secrets["OPENROUTER_API_KEY"],
-            max_tokens=500,
+            max_tokens=700,
             callbacks=[self.callback_handler],
             streaming=True,
             base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                "HTTP-Referer": "https://snowchat.streamlit.app/",
+                "X-Title": "Snowchat",
+            },
         )
 
-    # def setup_claude(self):
-    #     bedrock_runtime = boto3.client(
-    #         service_name="bedrock-runtime",
-    #         aws_access_key_id=self.secrets["AWS_ACCESS_KEY_ID"],
-    #         aws_secret_access_key=self.secrets["AWS_SECRET_ACCESS_KEY"],
-    #         region_name="us-east-1",
-    #     )
-    #     parameters = {
-    #         "max_tokens_to_sample": 1000,
-    #         "stop_sequences": [],
-    #         "temperature": 0,
-    #         "top_p": 0.9,
-    #     }
-    #     self.q_llm = BedrockChat(
-    #         model_id="anthropic.claude-instant-v1", client=bedrock_runtime
-    #     )
+    def setup_llama(self):
+        self.llm = ChatOpenAI(
+            model_name="meta-llama/llama-3-70b-instruct",
+            temperature=0.1,
+            api_key=self.secrets["OPENROUTER_API_KEY"],
+            max_tokens=700,
+            callbacks=[self.callback_handler],
+            streaming=True,
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                "HTTP-Referer": "https://snowchat.streamlit.app/",
+                "X-Title": "Snowchat",
+            },
+        )
 
-    #     self.llm = BedrockChat(
-    #         model_id="anthropic.claude-instant-v1",
-    #         client=bedrock_runtime,
-    #         callbacks=[self.callback_handler],
-    #         streaming=True,
-    #         model_kwargs=parameters,
-    #     )
+    def setup_arctic(self):
+        self.llm = ChatOpenAI(
+            model_name="snowflake/snowflake-arctic-instruct",
+            temperature=0.1,
+            api_key=self.secrets["OPENROUTER_API_KEY"],
+            max_tokens=700,
+            callbacks=[self.callback_handler],
+            streaming=True,
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                "HTTP-Referer": "https://snowchat.streamlit.app/",
+                "X-Title": "Snowchat",
+            },
+        )
 
     def get_chain(self, vectorstore):
         def _combine_documents(
@@ -153,12 +165,16 @@ def load_chain(model_name="GPT-3.5", callback_handler=None):
         query_name="v_match_documents",
     )
 
-    if "codellama" in model_name.lower():
-        model_type = "codellama"
-    elif "GPT-3.5" in model_name:
+    if "GPT-3.5" in model_name:
         model_type = "gpt"
-    elif "mixtral" in model_name.lower():
-        model_type = "mixtral"
+    elif "mixtral 8x7b" in model_name.lower():
+        model_type = "mixtral8x7b"
+    elif "claude" in model_name.lower():
+        model_type = "claude"
+    elif "llama" in model_name.lower():
+        model_type = "llama"
+    elif "arctic" in model_name.lower():
+        model_type = "arctic"
     else:
         raise ValueError(f"Unsupported model name: {model_name}")
 
