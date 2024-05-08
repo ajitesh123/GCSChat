@@ -168,3 +168,6 @@ class StreamlitUICallbackHandler(BaseCallbackHandler):
 
     def __call__(self, *args, **kwargs):
         pass
+    def query_document(self, question):
+        response = self.model.ask(question)
+        self.display_message(response, is_user=False)

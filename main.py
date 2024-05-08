@@ -181,15 +181,22 @@ if (
         )
         append_message(result.content)
 
-if (
-    st.session_state["model"] == "Mixtral 8x7B"
-    and st.session_state["messages"][-1]["content"] == ""
-):
-    st.session_state["rate-limit"] = True
-
-    # if get_sql(result):
-    #     conn = SnowflakeConnection().get_session()
-    #     df = execute_sql(get_sql(result), conn)
-    #     if df is not None:
-    #         callback_handler.display_dataframe(df)
-    #         append_message(df, "data", True)
+        # if get_sql(result):
+        #     conn = SnowflakeConnection().get_session()
+        #     df = execute_sql(get_sql(result), conn)
+        #     if df is not None:
+        #         callback_handler.display_dataframe(df)
+        #         append_message(df, "data", True)
+uploaded_file = st.sidebar.file_uploader("Upload PDF", type="pdf")
+if uploaded_file is not None:
+    public_url = GCloudStorage('your-bucket-name').upload_blob(uploaded_file, uploaded_file.name)
+    extracted_text = PDFExtractor().extract_text(uploaded_file)
+    DocumentProcessor().process(extracted_text)
+    question = st.text_input("Ask a question about the document:")
+    if question:
+        answer = StreamlitUICallbackHandler().query_document(question)
+        st.write(answer)
+try:
+    # Existing file upload and processing logic...
+except Exception as e:
+    st.error(f"An error occurred: {str(e)}")
