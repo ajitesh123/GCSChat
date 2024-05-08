@@ -33,11 +33,10 @@ class DocumentProcessor:
         )
         self.embeddings = OpenAIEmbeddings(openai_api_key=secrets.OPENAI_API_KEY)
 
-    def process(self) -> Dict[str, Any]:
-        data = self.loader.load()
-        texts = self.text_splitter.split_documents(data)
+    def process(self, file_stream) -> Dict[str, Any]:
+        text = PDFExtractor().extract_text(file_stream)
         vector_store = SupabaseVectorStore.from_documents(
-            texts, self.embeddings, client=self.client
+            [text], self.embeddings, client=self.client
         )
         return vector_store
 
